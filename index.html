@@ -931,7 +931,14 @@ let rankingMode = 'highest_profit';
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    // First-run: no saved data → seed with realistic demo data so the
+    // dashboard looks like an active business right away. The demo flag
+    // lets us surface a one-click "Clear demo data" button later.
+    if (!raw) {
+      const seeded = buildDemoState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+      return seeded;
+    }
     const parsed = JSON.parse(raw);
     // Merge to ensure new fields exist
     return {
@@ -949,6 +956,188 @@ function loadState() {
 }
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ============================================================
+   DEMO DATA
+   Builds a realistic starter dataset for first-run users so the
+   dashboard demonstrates how the app feels with real activity.
+   Bucket balances are derived (not hardcoded) by running the same
+   allocation logic the live app uses, so the math always reconciles.
+   ============================================================ */
+function buildDemoState() {
+  const s = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  s.isDemoData = true;
+
+  // Helper: ISO date string for N days ago.
+  const daysAgo = (n) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  };
+  // Helper: build a project record with derived cost fields filled in.
+  // Mirrors what saveDraftToPipeline() does at runtime.
+  const makeProject = (overrides) => {
+    const base = {
+      id: uuid(),
+      name: '', clientName: '', clientContact: '',
+      quotedPrice: 0, materialCost: 0, designCost: 0,
+      machineShopMinutes: 0, suppliesCost: 0, totalCost: 0,
+      recommendedPrice: 0, profit: 0,
+      dateStarted: null, dateCompleted: null, amountPaid: 0,
+      notes: '', status: 'upcoming', profitAllocated: false,
+      ...overrides
+    };
+    // Compute supplies / total / recommended using the live formula.
+    const settings = s.settings;
+    const supplies = (Number(base.materialCost) || 0) * (settings.suppliesPercent / 100);
+    const machineShop = ((Number(base.machineShopMinutes) || 0) / 60) * settings.shopRate;
+    const total = (Number(base.materialCost) || 0)
+                + (Number(base.designCost) || 0)
+                + machineShop + supplies;
+    const margin = settings.profitMargin / 100;
+    const rec = margin >= 1 ? total * 2 : total / (1 - margin);
+    base.suppliesCost = supplies;
+    base.totalCost = total;
+    base.recommendedPrice = rec;
+    return base;
+  };
+
+  // ---- Completed projects (oldest → newest so allocation runs in order) ----
+  const completed = [
+    makeProject({
+      name: 'Hold down clamps (set of 4)',
+      clientName: 'Mark T.',
+      clientContact: 'mark.t@example.com',
+      materialCost: 6, designCost: 0, machineShopMinutes: 25,
+      quotedPrice: 28, amountPaid: 28,
+      dateStarted: daysAgo(98), dateCompleted: daysAgo(95),
+      status: 'completed',
+      notes: 'Etsy order — repeat customer'
+    }),
+    makeProject({
+      name: 'Christmas porch sign',
+      clientName: 'Anderson family',
+      clientContact: '507-555-0142',
+      materialCost: 14, designCost: 3, machineShopMinutes: 45,
+      quotedPrice: 65, amountPaid: 65,
+      dateStarted: daysAgo(74), dateCompleted: daysAgo(70),
+      status: 'completed',
+      notes: 'Local pickup'
+    }),
+    makeProject({
+      name: 'Step stool',
+      clientName: 'Janet R.',
+      clientContact: 'janetr@example.com',
+      materialCost: 32, designCost: 0, machineShopMinutes: 120,
+      quotedPrice: 200, amountPaid: 200,
+      dateStarted: daysAgo(50), dateCompleted: daysAgo(45),
+      status: 'completed',
+      notes: 'Plans #2 — sold from website'
+    }),
+    makeProject({
+      name: 'Custom wood sign',
+      clientName: 'Smith family',
+      clientContact: 'smith.fam@example.com',
+      materialCost: 12, designCost: 5, machineShopMinutes: 50,
+      quotedPrice: 55, amountPaid: 55,
+      dateStarted: daysAgo(22), dateCompleted: daysAgo(18),
+      status: 'completed',
+      notes: 'Last name + est. date'
+    }),
+    makeProject({
+      name: 'Acacia cutting board set of 4',
+      clientName: 'Beth K.',
+      clientContact: 'beth.k@example.com',
+      materialCost: 35, designCost: 0, machineShopMinutes: 90,
+      quotedPrice: 240, amountPaid: 240,
+      dateStarted: daysAgo(12), dateCompleted: daysAgo(8),
+      status: 'completed',
+      notes: 'Wedding gift bundle — paddle + classic'
+    })
+  ];
+
+  // ---- In progress (deposit taken on one) ----
+  const inProgress = [
+    makeProject({
+      name: 'French cleat wall organizer',
+      clientName: 'Dave P.',
+      clientContact: 'dave.p@example.com',
+      materialCost: 45, designCost: 10, machineShopMinutes: 180,
+      quotedPrice: 185, amountPaid: 0,
+      dateStarted: daysAgo(12),
+      status: 'in_progress',
+      notes: 'Garage workshop — multi-hook layout'
+    }),
+    makeProject({
+      name: 'Personalized cutting board (anniversary)',
+      clientName: 'Greg & Lisa',
+      clientContact: '507-555-0188',
+      materialCost: 18, designCost: 0, machineShopMinutes: 75,
+      quotedPrice: 85, amountPaid: 40,
+      dateStarted: daysAgo(5),
+      status: 'in_progress',
+      notes: 'Deposit received — waiting on final wording'
+    })
+  ];
+
+  // ---- Upcoming (quoted, not started) ----
+  const upcoming = [
+    makeProject({
+      name: 'Keepsake box',
+      clientName: 'Maria S.',
+      clientContact: 'maria.s@example.com',
+      materialCost: 22, designCost: 0, machineShopMinutes: 150,
+      quotedPrice: 120, amountPaid: 0,
+      status: 'upcoming',
+      notes: 'Hinged lid, walnut'
+    }),
+    makeProject({
+      name: 'Family name sign',
+      clientName: 'The Petersons',
+      clientContact: 'peterson.home@example.com',
+      materialCost: 16, designCost: 0, machineShopMinutes: 60,
+      quotedPrice: 75, amountPaid: 0,
+      status: 'upcoming',
+      notes: 'Painted black with cedar backing'
+    })
+  ];
+
+  s.projects = [...completed, ...inProgress, ...upcoming];
+
+  // ---- Run the allocation logic against the temp state, mirroring
+  // allocateProject() — done here without the live function so we don't
+  // touch the global `state` while seeding.
+  const pct = s.settings.bucketPercents;
+  completed.forEach(p => {
+    const paid = Number(p.amountPaid) || 0;
+    if (paid < (Number(p.quotedPrice) || 0)) return;
+    const profit = paid - p.totalCost;
+    s.bucketBalances.businessFund += p.totalCost;                 // cost recovery
+    s.bucketBalances.businessFund += profit * (pct.businessFund / 100);
+    s.bucketBalances.charity      += profit * (pct.charity / 100);
+    s.bucketBalances.investment   += profit * (pct.investment / 100);
+    s.bucketBalances.myPay        += profit * (pct.myPay / 100);
+    p.profit = profit;
+    p.profitAllocated = true;
+  });
+
+  // ---- Purchases (deduct from business fund the same way the app does live) ----
+  const purchases = [
+    { id: uuid(), vendor: 'Menards',  amount: 31.75, date: daysAgo(78) },
+    { id: uuid(), vendor: 'Rockler',  amount: 24.50, date: daysAgo(50) },
+    { id: uuid(), vendor: 'Amazon',   amount: 58.99, date: daysAgo(35) },
+    { id: uuid(), vendor: 'Menards',  amount: 42.18, date: daysAgo(12) }
+  ];
+  purchases.forEach(p => { s.bucketBalances.businessFund -= p.amount; });
+  s.purchases = purchases;
+
+  // ---- One priority shop goal ----
+  s.shopGoals = [
+    { id: uuid(), name: 'New spindle', cost: 400, isPriority: true }
+  ];
+
+  return s;
 }
 
 /* ============================================================
@@ -1230,7 +1419,7 @@ function renderDashboard() {
       ${renderBucketCard('Business Fund', state.bucketBalances.businessFund, 'var(--color-frame-bottom)', true)}
     </div>
 
-    ${isEmpty ? `<p class="empty-hint">Open the included PDF guide to get started.</p>` : ''}
+    ${isEmpty ? `<p class="empty-hint">No projects yet — head to <strong>Project Calculator</strong> to add your first one.</p>` : ''}
   `;
 
   // wire period buttons
@@ -2111,6 +2300,19 @@ function openSetupModal() {
     </div>
 
     <div class="modal-section">
+      <h3>Demo Data</h3>
+      ${state.isDemoData
+        ? `<p class="help-text" style="margin:0 0 10px;">This dashboard is currently showing sample data so you can see how it works. When you're ready to start tracking your real shop, click <strong>Clear Demo Data</strong>.</p>`
+        : `<p class="help-text" style="margin:0 0 10px;">You can wipe everything and start fresh, or load the sample dataset back in to explore features.</p>`}
+      <div class="button-row">
+        ${state.isDemoData
+          ? `<button class="btn primary" id="s-clear-demo" type="button">Clear Demo Data</button>`
+          : `<button class="btn" id="s-reset-demo" type="button">Reset to Demo Data</button>
+             <button class="btn danger" id="s-clear-all" type="button">Clear All Data</button>`}
+      </div>
+    </div>
+
+    <div class="modal-section">
       <h3>Data Backup</h3>
       <div class="button-row">
         <button class="btn" id="s-export">Export My Data</button>
@@ -2164,6 +2366,82 @@ function openSetupModal() {
   document.getElementById('s-export').addEventListener('click', exportData);
   document.getElementById('s-import').addEventListener('click', () => document.getElementById('s-import-file').click());
   document.getElementById('s-import-file').addEventListener('change', importData);
+
+  // Demo data controls. Three flavors depending on current state:
+  //  • Clear Demo Data — only shown when demo data is loaded; wipes everything
+  //    and leaves the user with a clean slate (with their settings preserved).
+  //  • Clear All Data — shown after demo is gone; nuclear reset.
+  //  • Reset to Demo Data — shown after demo is gone; restores the sample set.
+  const clearDemoBtn = document.getElementById('s-clear-demo');
+  if (clearDemoBtn) {
+    clearDemoBtn.addEventListener('click', () => {
+      closeModal();
+      openModal(`
+        <h2 class="modal-title">Clear demo data?</h2>
+        <p>This will remove all sample projects, purchases, goals, and bucket balances so you can start tracking your real shop. Your shop settings (rate, margins, bucket percentages) will be kept.</p>
+        <div class="modal-actions">
+          <button class="btn subtle" id="cdCancel" type="button">Cancel</button>
+          <button class="btn primary" id="cdConfirm" type="button">Clear Demo Data</button>
+        </div>
+      `);
+      document.getElementById('cdCancel').addEventListener('click', closeModal);
+      document.getElementById('cdConfirm').addEventListener('click', () => {
+        const keepSettings = JSON.parse(JSON.stringify(state.settings));
+        state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        state.settings = keepSettings;
+        state.isDemoData = false;
+        saveState();
+        closeModal();
+        showToast('Demo data cleared');
+        renderView();
+      });
+    });
+  }
+  const resetDemoBtn = document.getElementById('s-reset-demo');
+  if (resetDemoBtn) {
+    resetDemoBtn.addEventListener('click', () => {
+      closeModal();
+      openModal(`
+        <h2 class="modal-title">Reset to demo data?</h2>
+        <p>This will replace all current projects, purchases, goals, and bucket balances with the sample dataset. Continue?</p>
+        <div class="modal-actions">
+          <button class="btn subtle" id="rdCancel" type="button">Cancel</button>
+          <button class="btn primary" id="rdConfirm" type="button">Load Demo Data</button>
+        </div>
+      `);
+      document.getElementById('rdCancel').addEventListener('click', closeModal);
+      document.getElementById('rdConfirm').addEventListener('click', () => {
+        state = buildDemoState();
+        saveState();
+        closeModal();
+        showToast('Demo data loaded');
+        renderView();
+      });
+    });
+  }
+  const clearAllBtn = document.getElementById('s-clear-all');
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', () => {
+      closeModal();
+      openModal(`
+        <h2 class="modal-title">Clear all data?</h2>
+        <p>This will erase every project, purchase, goal, and bucket balance. Settings will be reset to defaults too. This cannot be undone.</p>
+        <div class="modal-actions">
+          <button class="btn subtle" id="caCancel" type="button">Cancel</button>
+          <button class="btn danger" id="caConfirm" type="button">Erase Everything</button>
+        </div>
+      `);
+      document.getElementById('caCancel').addEventListener('click', closeModal);
+      document.getElementById('caConfirm').addEventListener('click', () => {
+        state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        state.isDemoData = false;
+        saveState();
+        closeModal();
+        showToast('All data cleared');
+        renderView();
+      });
+    });
+  }
 }
 
 function exportData() {
