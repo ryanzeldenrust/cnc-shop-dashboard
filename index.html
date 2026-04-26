@@ -1,0 +1,2254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CNC Shop Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CNC SHOP DASHBOARD
+   Single-file local app. All state lives in localStorage under
+   the key `cncShopDashboard`.
+   ============================================================ */
+
+:root {
+  --color-frame-top: #4c1a0d;
+  --color-frame-mid: #381107;
+  --color-frame-bottom: #280b04;
+  --color-frame-highlight: #6b3520;
+  --color-frame-border: #8c5430;
+  --color-cream: #F9F6F1;
+  --color-text-dark: #280b04;
+  --color-text-body: #000000;
+  --color-text-label: #893824;
+  --color-text-muted: #9c6942;
+  --color-copper: #cb6f36;
+  --color-orange-light: #f8aa53;
+  --color-gold: #f9d977;
+  --color-olive: #645403;
+  --color-button-inactive: #4C1A0D;
+  --color-button-border-inactive: #9c6942;
+  --color-button-border-active: #cb6f36;
+  --color-gauge-track: #E8DDC9;
+  --color-gauge-upcoming: #cb6f36;
+  --color-gauge-progress: #9c6942;
+  --color-gauge-complete: #645403;
+
+  --font-display: 'Bowlby One', Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  color: var(--color-text-body);
+  background:
+    radial-gradient(ellipse at center, #2a0e05 0%, #140602 100%);
+  min-height: 100vh;
+}
+
+body {
+  padding: 24px;
+}
+
+/* ----------------------------------------------------------
+   Outer metallic frame
+   ---------------------------------------------------------- */
+.frame {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  border-radius: 14px;
+  padding: 28px 28px 32px 28px;
+  background: linear-gradient(180deg, #6b3520 0%, #5a2818 8%, #4c1a0d 22%, #3d1408 38%, #2a0e05 55%, #381107 72%, #4c1a0d 88%, #2a0e05 100%);
+  border: 1px solid var(--color-frame-border);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.7),
+    0 8px 20px rgba(0,0,0,0.55),
+    0 4px 8px rgba(0,0,0,0.4),
+    inset 0 2px 0 rgba(255,210,160,0.4),
+    inset 0 -2px 0 rgba(0,0,0,0.6),
+    inset 2px 0 4px rgba(255,200,150,0.2),
+    inset -2px 0 4px rgba(0,0,0,0.55);
+}
+.frame::before, .frame::after {
+  content: '';
+  position: absolute;
+  left: 6px; right: 6px;
+  height: 3px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.frame::before {
+  top: 6px;
+  background: linear-gradient(90deg, transparent, rgba(255,220,180,0.45), transparent);
+}
+.frame::after {
+  bottom: 6px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.5), transparent);
+}
+
+/* ----------------------------------------------------------
+   Top bar: title + setup
+   ---------------------------------------------------------- */
+.top-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 0 4px;
+}
+.top-bar .spacer { }
+.title {
+  font-family: var(--font-display);
+  color: var(--color-gold);
+  text-align: center;
+  letter-spacing: 2px;
+  font-size: clamp(22px, 3.2vw, 36px);
+  text-shadow:
+    0 2px 0 rgba(0,0,0,0.5),
+    0 4px 14px rgba(0,0,0,0.6);
+  margin: 0;
+  line-height: 1;
+}
+.setup-btn {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-button-inactive);
+  color: var(--color-orange-light);
+  border: 1.5px solid var(--color-button-border-inactive);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,200,150,0.2);
+  transition: transform .12s ease, color .15s ease, border-color .15s ease;
+}
+.setup-btn:hover {
+  color: var(--color-gold);
+  border-color: var(--color-button-border-active);
+  transform: translateY(-1px);
+}
+.setup-btn svg { width: 16px; height: 16px; }
+
+/* ----------------------------------------------------------
+   Cream content area
+   ---------------------------------------------------------- */
+.content {
+  background-color: var(--color-cream);
+  background-image:
+    radial-gradient(rgba(137,56,36,0.04) 1px, transparent 1px),
+    radial-gradient(rgba(137,56,36,0.025) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(156,105,66,0.025) 25%, transparent 25%, transparent 75%, rgba(156,105,66,0.025) 75%);
+  background-size: 18px 18px, 27px 27px, 6px 6px;
+  background-position: 0 0, 9px 9px, 0 0;
+  border-radius: 10px;
+  box-shadow: inset 0 4px 14px rgba(0,0,0,0.18);
+  padding: 24px 22px 28px 22px;
+}
+
+/* ----------------------------------------------------------
+   Tab bar (lens buttons)
+   ---------------------------------------------------------- */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.tab-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  filter: drop-shadow(0 7px 14px rgba(0,0,0,0.55)) drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  transition: transform .12s ease, filter .15s ease;
+}
+.tab-btn:hover { transform: translateY(-1px); }
+.tab-btn:active { transform: translateY(1px); }
+.tab-btn svg { display: block; }
+.tab-btn .lens-text {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+/* ----------------------------------------------------------
+   Section headings & labels
+   ---------------------------------------------------------- */
+.section-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--color-text-label);
+  margin: 0 0 12px 0;
+  text-align: center;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.18);
+}
+.section-label.left { text-align: left; }
+
+.headline-num {
+  font-size: 38px;
+  font-weight: 500;
+  color: var(--color-text-dark);
+  text-shadow: 0 2px 5px rgba(0,0,0,0.18);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.headline-label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-text-label);
+  margin-bottom: 8px;
+}
+
+/* ----------------------------------------------------------
+   Dashboard layout
+   ---------------------------------------------------------- */
+.period-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.period-btn {
+  padding: 7px 14px;
+  border-radius: 22px;
+  border: 1.5px solid var(--color-button-border-inactive);
+  background: var(--color-button-inactive);
+  color: var(--color-orange-light);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  transition: all .15s ease;
+}
+.period-btn.active {
+  background: var(--color-olive);
+  color: var(--color-gold);
+  border-color: var(--color-button-border-active);
+}
+
+.headline-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  text-align: center;
+  margin: 14px 0 30px 0;
+  padding: 14px 10px;
+}
+
+/* Pipeline gauges row */
+.gauges-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+.gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.gauge-svg {
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,0.12));
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+.gauge-count {
+  font-family: var(--font-display);
+  fill: var(--color-text-dark);
+}
+.gauge-label-line1 {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--color-text-label);
+  margin-top: 4px;
+}
+.gauge-label-line2 {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Buckets row */
+.buckets-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.bucket-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+}
+.bucket-svg {
+  filter: drop-shadow(0 9px 18px rgba(0,0,0,0.38)) drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+  width: 140px;
+  max-width: 100%;
+  height: auto;
+}
+.bucket-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--color-text-label);
+  text-transform: uppercase;
+  text-align: center;
+}
+.bucket-amount {
+  fill: var(--color-text-dark);
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.bucket-amount-text {
+  font-size: 22px;
+  color: var(--color-text-dark);
+  font-weight: 600;
+  margin-top: 6px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.bucket-tax-warn {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--color-orange-light);
+  background: var(--color-frame-bottom);
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: .3px;
+}
+.bucket-adjust-link {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-copper);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+}
+.bucket-adjust-link:hover { color: var(--color-text-label); }
+
+.empty-hint {
+  font-style: italic;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+/* ----------------------------------------------------------
+   Forms / inputs
+   ---------------------------------------------------------- */
+.calc-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 22px;
+}
+.form-card, .panel-card {
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(156,105,66,0.35);
+  border-radius: 8px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.field { margin-bottom: 10px; }
+.field label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  color: var(--color-text-label);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(156,105,66,0.4);
+  background: #fffdf9;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-body);
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  outline: none;
+  border-color: var(--color-copper);
+  box-shadow: 0 0 0 3px rgba(203,111,54,0.18);
+}
+.field input.invalid, .field textarea.invalid {
+  border-color: #c0392b;
+  box-shadow: 0 0 0 3px rgba(192,57,43,0.15);
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.help-text {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  margin-top: 3px;
+  font-style: italic;
+}
+
+/* Calc panel - live calculations */
+.calc-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(156,105,66,0.3);
+  font-size: 14px;
+}
+.calc-line.bold { font-weight: 700; color: var(--color-text-dark); }
+.calc-line.big {
+  font-size: 17px;
+  border: none;
+  padding: 12px 0 4px;
+}
+.calc-rec-price {
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--color-text-dark);
+  text-align: center;
+  margin: 12px 0 2px;
+  letter-spacing: -1px;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+.calc-rec-tax {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+.calc-note {
+  margin-top: 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Generic action buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 22px;
+  border: 1.5px solid var(--color-button-border-inactive);
+  background: var(--color-button-inactive);
+  color: var(--color-orange-light);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  transition: all .15s ease;
+  text-decoration: none;
+}
+.btn:hover {
+  border-color: var(--color-button-border-active);
+  color: var(--color-gold);
+  transform: translateY(-1px);
+}
+.btn.primary {
+  background: var(--color-olive);
+  color: var(--color-gold);
+  border-color: var(--color-button-border-active);
+}
+.btn.subtle {
+  background: transparent;
+  color: var(--color-text-label);
+  border: 1.5px solid rgba(156,105,66,0.5);
+  box-shadow: none;
+}
+.btn.subtle:hover {
+  background: rgba(203,111,54,0.08);
+  color: var(--color-text-dark);
+}
+.btn.danger {
+  background: #5a1a10;
+  border-color: #8c2a1c;
+  color: #f5c6b8;
+}
+.btn.small {
+  padding: 5px 11px;
+  font-size: 10.5px;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ----------------------------------------------------------
+   Pipeline cards
+   ---------------------------------------------------------- */
+.pipeline-section { margin-bottom: 22px; }
+.pipeline-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.project-card {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(156,105,66,0.35);
+  border-left: 4px solid var(--color-copper);
+  border-radius: 6px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+}
+.project-card.in-progress { border-left-color: var(--color-text-muted); }
+.project-card.completed { border-left-color: var(--color-olive); }
+.project-card .pname {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--color-text-dark);
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+.project-card .pclient {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+.project-card .pgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.project-card .plabel { color: var(--color-text-label); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+.project-card .pval { color: var(--color-text-dark); font-weight: 600; }
+.project-card .pactions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.empty-state {
+  padding: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 13px;
+  border: 1px dashed rgba(156,105,66,0.4);
+  border-radius: 8px;
+}
+
+/* Profit Tracker */
+.tracker-buckets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.purchase-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.purchase-table th, .purchase-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(156,105,66,0.2);
+}
+.purchase-table th {
+  background: rgba(156,105,66,0.12);
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: var(--color-text-label);
+  text-transform: uppercase;
+}
+.purchase-table tr:last-child td { border-bottom: none; }
+.purchase-table .num { text-align: right; }
+.ytd-line {
+  text-align: right;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--color-text-dark);
+  letter-spacing: 0.5px;
+}
+.purchase-add-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+/* Shop goals */
+.goal-priority {
+  background: rgba(255,255,255,0.65);
+  border: 1.5px solid var(--color-copper);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.goal-priority .gname {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--color-text-dark);
+  letter-spacing: 0.5px;
+}
+.goal-priority .gprog-text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 6px 0 10px;
+}
+.progress-track {
+  width: 100%;
+  height: 18px;
+  background: var(--color-gauge-track);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-copper), var(--color-orange-light));
+  border-radius: 999px;
+  transition: width .4s ease;
+}
+.ready-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--color-olive);
+  color: var(--color-gold);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.goals-list {
+  display: grid;
+  gap: 8px;
+}
+.goal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid rgba(156,105,66,0.3);
+  border-radius: 6px;
+}
+.goal-item .gn { font-weight: 600; color: var(--color-text-dark); }
+.goal-item .gc { color: var(--color-text-muted); font-size: 13px; }
+.shop-reminder {
+  font-style: italic;
+  color: var(--color-text-label);
+  font-size: 12.5px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(203,111,54,0.07);
+  border-left: 3px solid var(--color-copper);
+  border-radius: 4px;
+}
+
+/* Rankings */
+.rankings-block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(156,105,66,0.4);
+}
+.rankings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.rankings-list {
+  display: grid;
+  gap: 8px;
+}
+.rank-row {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 5px;
+  border: 1px solid rgba(156,105,66,0.25);
+  font-size: 13.5px;
+}
+.rank-row .rn {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--color-copper);
+}
+
+/* ----------------------------------------------------------
+   Modal
+   ---------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20,6,2,0.78);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 100;
+  overflow-y: auto;
+  padding: 30px 16px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: linear-gradient(180deg, #6b3520 0%, #4c1a0d 50%, #2a0e05 100%);
+  border: 1px solid var(--color-frame-border);
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 640px;
+  width: 100%;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.7),
+    inset 0 2px 0 rgba(255,210,160,0.3);
+}
+.modal-inner {
+  background-color: var(--color-cream);
+  background-image:
+    radial-gradient(rgba(137,56,36,0.04) 1px, transparent 1px),
+    radial-gradient(rgba(137,56,36,0.025) 1px, transparent 1px);
+  background-size: 18px 18px, 27px 27px;
+  background-position: 0 0, 9px 9px;
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: inset 0 4px 14px rgba(0,0,0,0.18);
+}
+.modal-title {
+  font-family: var(--font-display);
+  color: var(--color-text-dark);
+  font-size: 20px;
+  letter-spacing: 1px;
+  margin: 0 0 14px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.modal-section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed rgba(156,105,66,0.4);
+}
+.modal-section:last-of-type { border-bottom: none; }
+.modal-section h3 {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1.4px;
+  color: var(--color-text-label);
+  text-transform: uppercase;
+  margin: 0 0 10px 0;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.bucket-pct-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.bucket-pct-total {
+  margin-top: 10px;
+  font-size: 13px;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  color: var(--color-text-dark);
+}
+.bucket-pct-total.invalid { color: #c0392b; }
+
+/* ----------------------------------------------------------
+   Toast
+   ---------------------------------------------------------- */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--color-olive);
+  color: var(--color-gold);
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  letter-spacing: 1px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: all .25s ease;
+  z-index: 200;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Choice popover for new project */
+.choice-popover {
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(156,105,66,0.5);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.choice-popover .choice-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ----------------------------------------------------------
+   Responsive
+   ---------------------------------------------------------- */
+@media (max-width: 880px) {
+  .calc-grid { grid-template-columns: 1fr; }
+  .gauges-row { grid-template-columns: 1fr; }
+  .buckets-row, .tracker-buckets { grid-template-columns: repeat(2, 1fr); }
+  .purchase-add-form { grid-template-columns: 1fr 1fr; }
+  .headline-row { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (max-width: 520px) {
+  body { padding: 10px; }
+  .frame { padding: 16px; }
+  .content { padding: 16px 12px; }
+  .buckets-row, .tracker-buckets { grid-template-columns: 1fr 1fr; }
+  .headline-num { font-size: 30px; }
+  .top-bar { grid-template-columns: 1fr auto; }
+  .top-bar .spacer { display: none; }
+  .title { text-align: left; }
+}
+
+/* Hidden helper */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="top-bar">
+    <div class="spacer"></div>
+    <h1 class="title">CNC SHOP DASHBOARD</h1>
+    <button class="setup-btn" id="setupBtn" type="button" aria-label="Open setup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Setup
+    </button>
+  </div>
+
+  <div class="content">
+    <nav class="tab-bar" id="tabBar"></nav>
+    <main id="view"></main>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-inner" id="modalInner"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   STATE & STORAGE
+   ============================================================ */
+const STORAGE_KEY = 'cncShopDashboard';
+const DEFAULT_STATE = {
+  settings: {
+    shopRate: 12,
+    suppliesPercent: 20,
+    profitMargin: 50,
+    salesTaxPercent: 0,
+    bucketPercents: { charity: 10, investment: 10, myPay: 30, businessFund: 50 }
+  },
+  projects: [],
+  purchases: [],
+  shopGoals: [],
+  bucketAdjustments: [],
+  bucketBalances: { charity: 0, investment: 0, myPay: 0, businessFund: 0 }
+};
+
+let state = loadState();
+let currentTab = 'dashboard';
+let dashboardPeriod = 'last30';
+let trackerPeriod = 'last30';
+let rankingMode = 'highest_profit';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    const parsed = JSON.parse(raw);
+    // Merge to ensure new fields exist
+    return {
+      ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
+      ...parsed,
+      settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}),
+        bucketPercents: { ...DEFAULT_STATE.settings.bucketPercents, ...((parsed.settings || {}).bucketPercents || {}) }
+      },
+      bucketBalances: { ...DEFAULT_STATE.bucketBalances, ...(parsed.bucketBalances || {}) }
+    };
+  } catch (e) {
+    console.error('Failed to load state', e);
+    return JSON.parse(JSON.stringify(DEFAULT_STATE));
+  }
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function uuid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Math.random().toString(36).slice(2) + Date.now();
+}
+function fmt$(n) {
+  if (n === null || n === undefined || isNaN(n)) n = 0;
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmt$0(n) {
+  if (n === null || n === undefined || isNaN(n)) n = 0;
+  return '$' + Math.round(Number(n)).toLocaleString('en-US');
+}
+function todayISO() {
+  return new Date().toISOString().slice(0,10);
+}
+function withinDays(isoDate, days) {
+  if (!isoDate) return false;
+  const d = new Date(isoDate);
+  const now = new Date();
+  const diff = (now - d) / (1000 * 60 * 60 * 24);
+  return diff <= days && diff >= -1;
+}
+function inCurrentYear(isoDate) {
+  if (!isoDate) return false;
+  return new Date(isoDate).getFullYear() === new Date().getFullYear();
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ============================================================
+   FORMULAS
+   ============================================================ */
+function calcProjectCosts(p) {
+  const settings = state.settings;
+  const material = Number(p.materialCost) || 0;
+  const design = Number(p.designCost) || 0;
+  const minutes = Number(p.machineShopMinutes) || 0;
+  const suppliesCost = material * (settings.suppliesPercent / 100);
+  const machineShopCost = (minutes / 60) * settings.shopRate;
+  const totalCost = material + design + machineShopCost + suppliesCost;
+  const margin = settings.profitMargin / 100;
+  // Avoid divide-by-zero / >100% margins
+  const recommendedPrice = margin >= 1 ? totalCost * 2 : totalCost / (1 - margin);
+  return { suppliesCost, machineShopCost, totalCost, recommendedPrice };
+}
+
+/* ============================================================
+   ALLOCATION (when project is completed AND fully paid)
+   ============================================================ */
+function allocateProject(p) {
+  if (p.profitAllocated) return;
+  const paid = Number(p.amountPaid) || 0;
+  if (paid < (Number(p.quotedPrice) || 0)) return;
+
+  const totalCost = Number(p.totalCost) || 0;
+  const profit = paid - totalCost;
+  const pct = state.settings.bucketPercents;
+
+  // Cost recovery -> business fund
+  state.bucketBalances.businessFund += totalCost;
+  // Profit share
+  state.bucketBalances.businessFund += profit * (pct.businessFund / 100);
+  state.bucketBalances.charity += profit * (pct.charity / 100);
+  state.bucketBalances.investment += profit * (pct.investment / 100);
+  state.bucketBalances.myPay += profit * (pct.myPay / 100);
+
+  p.profit = profit;
+  p.profitAllocated = true;
+  saveState();
+}
+
+/** Reverse a previously-allocated project (used on delete). */
+function reverseAllocation(p) {
+  if (!p.profitAllocated) return;
+  const paid = Number(p.amountPaid) || 0;
+  const totalCost = Number(p.totalCost) || 0;
+  const profit = paid - totalCost;
+  const pct = state.settings.bucketPercents;
+
+  state.bucketBalances.businessFund -= totalCost;
+  state.bucketBalances.businessFund -= profit * (pct.businessFund / 100);
+  state.bucketBalances.charity -= profit * (pct.charity / 100);
+  state.bucketBalances.investment -= profit * (pct.investment / 100);
+  state.bucketBalances.myPay -= profit * (pct.myPay / 100);
+  saveState();
+}
+
+/* ============================================================
+   SVG SHAPE HELPERS
+   ============================================================ */
+function lensButtonSVG(text, active) {
+  // Approximate width based on text length; minimum width keeps shorter words readable.
+  const padding = 28;
+  const charW = 9.2;
+  const w = Math.max(140, Math.round(text.length * charW + padding * 2));
+  const h = 50;
+  // Path: curved top, straight sides, curved bottom
+  const path = `M 0 10 Q ${w/2} -5 ${w} 10 L ${w} 40 Q ${w/2} 55 0 40 Z`;
+  const fill = active ? 'var(--color-olive)' : 'var(--color-button-inactive)';
+  const stroke = active ? 'var(--color-button-border-active)' : 'var(--color-button-border-inactive)';
+  const textColor = active ? 'var(--color-gold)' : 'var(--color-orange-light)';
+  return `
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lg-${active ? 'on' : 'off'}-${w}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${active ? '#7a6710' : '#5e2818'}"/>
+          <stop offset="100%" stop-color="${active ? '#4a3e02' : '#2e0f08'}"/>
+        </linearGradient>
+      </defs>
+      <path d="${path}" fill="url(#lg-${active ? 'on' : 'off'}-${w})" stroke="${stroke}" stroke-width="1.5"/>
+      <path d="M 4 12 Q ${w/2} 0 ${w-4} 12" stroke="rgba(255,210,160,0.35)" stroke-width="1.2" fill="none"/>
+      <text x="${w/2}" y="29" text-anchor="middle" fill="${textColor}"
+        font-family="Bowlby One, Georgia, serif" font-size="13" letter-spacing="1.2">${text.toUpperCase()}</text>
+    </svg>
+  `;
+}
+
+/**
+ * Render a bucket-shaped SVG card with the label and dollar amount drawn
+ * directly on top of the bucket. Solid white fill, copper rim accent.
+ *
+ * @param {string} labelText  - e.g. "Charity"
+ * @param {string} amountText - e.g. "$0"
+ */
+function bucketSVG(labelText, amountText) {
+  // Bucket body: wide curved rim at top, tapering to narrower base.
+  const body = "M 10 15 Q 70 5 130 15 L 115 105 Q 70 115 25 105 Z";
+  // Copper rim: narrow band hugging the top curve.
+  const rim  = "M 10 15 Q 70 5 130 15 L 130 22 Q 70 12 10 22 Z";
+  return `
+    <svg class="bucket-svg" viewBox="0 0 140 120" xmlns="http://www.w3.org/2000/svg">
+      <!-- Bucket body: solid white fill, brown stroke -->
+      <path d="${body}" fill="#FFFFFF" stroke="#9c6942" stroke-width="2"/>
+      <!-- Copper rim accent across the top -->
+      <path d="${rim}" fill="#cb6f36"/>
+      <!-- Faint horizontal banding for a slight metal texture -->
+      <line x1="16" y1="45" x2="124" y2="48" stroke="rgba(156,105,66,0.18)" stroke-width="1"/>
+      <line x1="20" y1="92" x2="120" y2="94" stroke="rgba(156,105,66,0.14)" stroke-width="1"/>
+      <!-- Label sits in the upper-middle of the bucket -->
+      <text x="70" y="58" text-anchor="middle"
+        font-family="Bowlby One, Georgia, serif" font-size="11"
+        letter-spacing="1.2" fill="#893824">${escapeHtml(labelText).toUpperCase()}</text>
+      <!-- Dollar amount sits in the lower-middle of the bucket -->
+      <text x="70" y="88" text-anchor="middle"
+        font-family="Bowlby One, Georgia, serif" font-size="20"
+        fill="#280b04">${escapeHtml(amountText)}</text>
+    </svg>
+  `;
+}
+
+function gaugeSVG(count, max, fillColor) {
+  // Two half-circles using stroke-dasharray.
+  // Half circumference of r=80 ≈ 251.2, full ≈ 502.4
+  const ratio = Math.max(0, Math.min(1, count / max));
+  const fillLen = 251.2 * ratio;
+  return `
+    <svg class="gauge-svg" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(100,100) rotate(180)">
+        <circle r="80" fill="none" stroke="var(--color-gauge-track)" stroke-width="14"
+          stroke-dasharray="251.2 502.4" stroke-linecap="round"/>
+        <circle r="80" fill="none" stroke="${fillColor}" stroke-width="14"
+          stroke-dasharray="${fillLen} 502.4" stroke-linecap="round"/>
+      </g>
+      <text x="100" y="92" text-anchor="middle" class="gauge-count" font-size="36">${count}</text>
+    </svg>
+  `;
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'calculator', label: 'Project Calculator' },
+  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'tracker', label: 'Profit Tracker' },
+  { id: 'goals', label: 'Shop Goals' },
+];
+
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  bar.innerHTML = '';
+  TABS.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.type = 'button';
+    btn.innerHTML = lensButtonSVG(t.label, t.id === currentTab);
+    btn.addEventListener('click', () => {
+      currentTab = t.id;
+      renderTabs();
+      renderView();
+    });
+    bar.appendChild(btn);
+  });
+}
+
+function renderView() {
+  switch (currentTab) {
+    case 'dashboard':  return renderDashboard();
+    case 'calculator': return renderCalculator();
+    case 'pipeline':   return renderPipeline();
+    case 'tracker':    return renderTracker();
+    case 'goals':      return renderGoals();
+  }
+}
+
+/* ============================================================
+   VIEW: DASHBOARD
+   ============================================================ */
+function renderDashboard() {
+  const view = document.getElementById('view');
+  const completed = state.projects.filter(p => p.status === 'completed');
+  const filtered = completed.filter(p => dashboardPeriod === 'last30'
+    ? withinDays(p.dateCompleted, 30)
+    : inCurrentYear(p.dateCompleted));
+
+  const revenue = filtered.reduce((s, p) => s + (Number(p.amountPaid) || 0), 0);
+  const profit = filtered.reduce((s, p) => s + (Number(p.profit) || 0), 0);
+
+  const upcoming = state.projects.filter(p => p.status === 'upcoming');
+  const inProg = state.projects.filter(p => p.status === 'in_progress');
+  const periodCompleted = filtered;
+
+  const upcomingQuoted = upcoming.reduce((s,p) => s + (Number(p.quotedPrice)||0), 0);
+  const inProgOwed = inProg.reduce((s,p) => s + ((Number(p.quotedPrice)||0) - (Number(p.amountPaid)||0)), 0);
+
+  const isEmpty = state.projects.length === 0;
+
+  view.innerHTML = `
+    <div class="period-toggle">
+      <button class="period-btn ${dashboardPeriod==='last30'?'active':''}" data-pp="last30">Last 30 days</button>
+      <button class="period-btn ${dashboardPeriod==='ytd'?'active':''}" data-pp="ytd">Year to date</button>
+    </div>
+
+    <div class="headline-row">
+      <div>
+        <div class="headline-label">Total Revenue</div>
+        <div class="headline-num">${fmt$0(revenue)}</div>
+      </div>
+      <div>
+        <div class="headline-label">Total Profit</div>
+        <div class="headline-num">${fmt$0(profit)}</div>
+      </div>
+    </div>
+
+    <h2 class="section-label">Pipeline</h2>
+    <div class="gauges-row">
+      <div class="gauge-card">
+        ${gaugeSVG(upcoming.length, 10, 'var(--color-gauge-upcoming)')}
+        <div class="gauge-label-line1">Upcoming</div>
+        <div class="gauge-label-line2">${fmt$0(upcomingQuoted)} quoted</div>
+      </div>
+      <div class="gauge-card">
+        ${gaugeSVG(inProg.length, 10, 'var(--color-gauge-progress)')}
+        <div class="gauge-label-line1">In Progress</div>
+        <div class="gauge-label-line2">${fmt$0(inProgOwed)} owed</div>
+      </div>
+      <div class="gauge-card">
+        ${gaugeSVG(periodCompleted.length, 30, 'var(--color-gauge-complete)')}
+        <div class="gauge-label-line1">Completed</div>
+        <div class="gauge-label-line2">this period</div>
+      </div>
+    </div>
+
+    <h2 class="section-label">Profit Buckets</h2>
+    <div class="buckets-row">
+      ${renderBucketCard('Charity', state.bucketBalances.charity, 'var(--color-copper)')}
+      ${renderBucketCard('Investment', state.bucketBalances.investment, 'var(--color-text-muted)')}
+      ${renderBucketCard('My Pay', state.bucketBalances.myPay, 'var(--color-olive)')}
+      ${renderBucketCard('Business Fund', state.bucketBalances.businessFund, 'var(--color-frame-bottom)', true)}
+    </div>
+
+    ${isEmpty ? `<p class="empty-hint">Open the included PDF guide to get started.</p>` : ''}
+  `;
+
+  // wire period buttons
+  view.querySelectorAll('[data-pp]').forEach(b => {
+    b.addEventListener('click', () => {
+      dashboardPeriod = b.dataset.pp;
+      renderDashboard();
+    });
+  });
+}
+
+function renderBucketCard(name, amount, accent, taxWarn) {
+  // Label and dollar amount are drawn inside the SVG itself.
+  // `accent` retained in the signature for backward compatibility with callers,
+  // though the bucket now uses a fixed white fill + copper rim.
+  return `
+    <div class="bucket-card">
+      ${bucketSVG(name, fmt$0(amount))}
+      ${taxWarn ? `<div class="bucket-tax-warn">⚠ Taxes not yet paid</div>` : ''}
+    </div>
+  `;
+}
+
+/* ============================================================
+   VIEW: PROJECT CALCULATOR
+   ============================================================ */
+let calcDraft = null;       // holds in-progress form data
+let calcShowChoice = false; // toggles the "new vs repeat" picker
+
+function blankProject() {
+  return {
+    id: null,
+    name: '',
+    clientName: '',
+    clientContact: '',
+    quotedPrice: '',
+    materialCost: '',
+    designCost: '',
+    machineShopMinutes: '',
+    notes: ''
+  };
+}
+
+function renderCalculator() {
+  if (!calcDraft) calcDraft = blankProject();
+  const view = document.getElementById('view');
+  const completedProjects = state.projects.filter(p => p.status === 'completed');
+
+  view.innerHTML = `
+    <div class="toolbar">
+      <h2 class="section-label left" style="margin:0;">Project Calculator</h2>
+      <button class="btn primary" id="btnNewProject">+ New Project</button>
+    </div>
+
+    ${calcShowChoice ? `
+      <div class="choice-popover">
+        <div style="margin-bottom:10px; font-size:13px; color:var(--color-text-dark); font-weight:600;">Start fresh or repeat a past project?</div>
+        <div class="choice-row">
+          <button class="btn" id="choiceFresh">New project</button>
+          ${completedProjects.length > 0 ? `
+            <select id="choiceRepeat" class="btn" style="font-family:var(--font-body); text-transform:none;">
+              <option value="">Repeat from past project…</option>
+              ${completedProjects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
+            </select>
+          ` : `<span style="font-size:12px; color:var(--color-text-muted); align-self:center;">(no past projects to repeat yet)</span>`}
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="calc-grid">
+      <div class="form-card">
+        <div class="field">
+          <label>Project name *</label>
+          <input type="text" id="f-name" value="${escapeHtml(calcDraft.name)}">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Client name *</label>
+            <input type="text" id="f-clientName" value="${escapeHtml(calcDraft.clientName)}">
+          </div>
+          <div class="field">
+            <label>Client contact</label>
+            <input type="text" id="f-clientContact" value="${escapeHtml(calcDraft.clientContact)}" placeholder="phone or email">
+          </div>
+        </div>
+        <div class="field">
+          <label>Quoted price ($)</label>
+          <input type="number" min="0" step="0.01" id="f-quotedPrice" value="${calcDraft.quotedPrice}">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Material cost ($)</label>
+            <input type="number" min="0" step="0.01" id="f-materialCost" value="${calcDraft.materialCost}">
+          </div>
+          <div class="field">
+            <label>Design / setup cost ($)</label>
+            <input type="number" min="0" step="0.01" id="f-designCost" value="${calcDraft.designCost}">
+          </div>
+        </div>
+        <div class="field">
+          <label>Machine + shop time (minutes)</label>
+          <input type="number" min="0" step="1" id="f-machineShopMinutes" value="${calcDraft.machineShopMinutes}">
+        </div>
+        <div class="field">
+          <label>Notes</label>
+          <textarea id="f-notes" rows="3">${escapeHtml(calcDraft.notes)}</textarea>
+        </div>
+        <div class="button-row">
+          <button class="btn primary" id="btnSavePipeline">Save to Pipeline</button>
+          <button class="btn subtle" id="btnCancelCalc">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panel-card" id="calcPanel">
+        ${renderCalcPanel()}
+      </div>
+    </div>
+  `;
+
+  // wire fields -> live recalc
+  const fieldIds = ['name','clientName','clientContact','quotedPrice','materialCost','designCost','machineShopMinutes','notes'];
+  fieldIds.forEach(k => {
+    const el = document.getElementById('f-' + k);
+    el.addEventListener('input', () => {
+      calcDraft[k] = el.value;
+      document.getElementById('calcPanel').innerHTML = renderCalcPanel();
+    });
+  });
+
+  document.getElementById('btnNewProject').addEventListener('click', () => {
+    calcShowChoice = !calcShowChoice;
+    renderCalculator();
+  });
+  if (calcShowChoice) {
+    document.getElementById('choiceFresh').addEventListener('click', () => {
+      calcDraft = blankProject();
+      calcShowChoice = false;
+      renderCalculator();
+    });
+    const sel = document.getElementById('choiceRepeat');
+    if (sel) sel.addEventListener('change', () => {
+      const p = state.projects.find(x => x.id === sel.value);
+      if (p) {
+        calcDraft = {
+          id: null,
+          name: p.name,
+          clientName: '',
+          clientContact: '',
+          quotedPrice: p.quotedPrice || '',
+          materialCost: p.materialCost || '',
+          designCost: p.designCost || '',
+          machineShopMinutes: p.machineShopMinutes || '',
+          notes: p.notes || ''
+        };
+        calcShowChoice = false;
+        renderCalculator();
+      }
+    });
+  }
+
+  document.getElementById('btnSavePipeline').addEventListener('click', saveDraftToPipeline);
+  document.getElementById('btnCancelCalc').addEventListener('click', () => {
+    calcDraft = blankProject();
+    calcShowChoice = false;
+    renderCalculator();
+  });
+}
+
+function renderCalcPanel() {
+  const p = {
+    materialCost: Number(calcDraft.materialCost) || 0,
+    designCost: Number(calcDraft.designCost) || 0,
+    machineShopMinutes: Number(calcDraft.machineShopMinutes) || 0
+  };
+  const c = calcProjectCosts(p);
+  const taxPct = Number(state.settings.salesTaxPercent) || 0;
+  const priceWithTax = c.recommendedPrice * (1 + taxPct/100);
+  return `
+    <h2 class="section-label" style="text-align:left; margin-bottom:10px;">Live Calculation</h2>
+    <div class="calc-line"><span>Supplies cost (${state.settings.suppliesPercent}% of material)</span><span>${fmt$(c.suppliesCost)}</span></div>
+    <div class="calc-line"><span>Machine + shop cost (${state.settings.shopRate}/hr)</span><span>${fmt$(c.machineShopCost)}</span></div>
+    <div class="calc-line bold big"><span>Total project cost</span><span>${fmt$(c.totalCost)}</span></div>
+    <div style="margin-top:14px;">
+      <div style="font-family:var(--font-display); font-size:11px; letter-spacing:1.4px; color:var(--color-text-label); text-align:center; text-transform:uppercase;">Recommended Selling Price</div>
+      <div class="calc-rec-price">${fmt$(c.recommendedPrice)}</div>
+      ${taxPct > 0 ? `<div class="calc-rec-tax">With sales tax (${taxPct}%): <strong>${fmt$(priceWithTax)}</strong></div>` : ''}
+    </div>
+    <p class="calc-note">A ${state.settings.profitMargin}% profit margin means about half of your selling price is profit.</p>
+  `;
+}
+
+function saveDraftToPipeline() {
+  // validate required fields
+  let valid = true;
+  ['name','clientName'].forEach(k => {
+    const el = document.getElementById('f-' + k);
+    if (!calcDraft[k] || !calcDraft[k].toString().trim()) {
+      el.classList.add('invalid');
+      valid = false;
+    } else {
+      el.classList.remove('invalid');
+    }
+  });
+  if (!valid) {
+    showToast('Project name and client name required');
+    return;
+  }
+  const c = calcProjectCosts({
+    materialCost: Number(calcDraft.materialCost) || 0,
+    designCost: Number(calcDraft.designCost) || 0,
+    machineShopMinutes: Number(calcDraft.machineShopMinutes) || 0
+  });
+  const project = {
+    id: uuid(),
+    name: calcDraft.name.trim(),
+    clientName: calcDraft.clientName.trim(),
+    clientContact: (calcDraft.clientContact || '').trim(),
+    quotedPrice: Number(calcDraft.quotedPrice) || 0,
+    materialCost: Number(calcDraft.materialCost) || 0,
+    designCost: Number(calcDraft.designCost) || 0,
+    machineShopMinutes: Number(calcDraft.machineShopMinutes) || 0,
+    suppliesCost: c.suppliesCost,
+    totalCost: c.totalCost,
+    recommendedPrice: c.recommendedPrice,
+    profit: 0,
+    dateStarted: null,
+    dateCompleted: null,
+    amountPaid: 0,
+    notes: (calcDraft.notes || '').trim(),
+    status: 'upcoming',
+    profitAllocated: false
+  };
+  state.projects.push(project);
+  saveState();
+  calcDraft = blankProject();
+  calcShowChoice = false;
+  showToast('Saved to Pipeline');
+  currentTab = 'pipeline';
+  renderTabs();
+  renderView();
+}
+
+/* ============================================================
+   VIEW: PIPELINE
+   ============================================================ */
+function renderPipeline() {
+  const view = document.getElementById('view');
+  const upcoming = state.projects.filter(p => p.status === 'upcoming');
+  const inProg = state.projects.filter(p => p.status === 'in_progress');
+  const completed = state.projects.filter(p => p.status === 'completed');
+
+  view.innerHTML = `
+    <div class="toolbar">
+      <h2 class="section-label left" style="margin:0;">Pipeline</h2>
+      <button class="btn primary" id="btnPlNew">+ New Project</button>
+    </div>
+
+    <section class="pipeline-section">
+      <h3 class="section-label left">Upcoming</h3>
+      ${upcoming.length === 0
+        ? `<div class="empty-state">No projects yet</div>`
+        : `<div class="pipeline-cards">${upcoming.map(renderUpcomingCard).join('')}</div>`}
+    </section>
+
+    <section class="pipeline-section">
+      <h3 class="section-label left">In Progress</h3>
+      ${inProg.length === 0
+        ? `<div class="empty-state">No projects yet</div>`
+        : `<div class="pipeline-cards">${inProg.map(renderInProgressCard).join('')}</div>`}
+    </section>
+
+    <section class="pipeline-section">
+      <h3 class="section-label left">Completed</h3>
+      ${completed.length === 0
+        ? `<div class="empty-state">No projects yet</div>`
+        : `<div class="pipeline-cards">${completed.map(renderCompletedCard).join('')}</div>`}
+
+      ${completed.length > 0 ? `
+        <div class="rankings-block">
+          <div class="rankings-toolbar">
+            <h3 class="section-label left" style="margin:0;">Project Rankings</h3>
+            <select id="rankSel" class="btn subtle" style="font-family:var(--font-body); text-transform:none;">
+              <option value="highest_profit" ${rankingMode==='highest_profit'?'selected':''}>Highest profit</option>
+              <option value="best_margin" ${rankingMode==='best_margin'?'selected':''}>Best profit margin</option>
+              <option value="profit_per_hour" ${rankingMode==='profit_per_hour'?'selected':''}>Profit per hour</option>
+            </select>
+          </div>
+          <div class="rankings-list">
+            ${rankProjects(completed).map((p,i) => `
+              <div class="rank-row">
+                <span class="rn">#${i+1}</span>
+                <span><strong>${escapeHtml(p.name)}</strong> · <span style="color:var(--color-text-muted);">${escapeHtml(p.clientName)}</span></span>
+                <span style="font-weight:600; color:var(--color-text-dark);">${rankValue(p)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </section>
+  `;
+
+  document.getElementById('btnPlNew').addEventListener('click', () => {
+    calcDraft = blankProject();
+    calcShowChoice = false;
+    currentTab = 'calculator';
+    renderTabs();
+    renderView();
+  });
+
+  // wire upcoming actions
+  view.querySelectorAll('[data-act-move-progress]').forEach(b => {
+    b.addEventListener('click', () => {
+      const p = state.projects.find(x => x.id === b.dataset.actMoveProgress);
+      p.status = 'in_progress';
+      p.dateStarted = todayISO();
+      saveState();
+      renderPipeline();
+    });
+  });
+  view.querySelectorAll('[data-act-edit]').forEach(b => {
+    b.addEventListener('click', () => openEditProjectModal(b.dataset.actEdit));
+  });
+  view.querySelectorAll('[data-act-del]').forEach(b => {
+    b.addEventListener('click', () => confirmDeleteProject(b.dataset.actDel));
+  });
+  view.querySelectorAll('[data-save-payment]').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.savePayment;
+      const p = state.projects.find(x => x.id === id);
+      if (!p) return;
+      const input = view.querySelector(`[data-add-payment="${id}"]`);
+      const amount = Number(input.value);
+      if (!amount || amount <= 0) {
+        showToast('Enter a payment amount');
+        input.focus();
+        return;
+      }
+      // Additive: each saved payment increments the running total.
+      p.amountPaid = (Number(p.amountPaid) || 0) + amount;
+      saveState();
+      showToast(`Added ${fmt$(amount)} — paid so far ${fmt$(p.amountPaid)}`);
+      renderPipeline();
+    });
+  });
+  view.querySelectorAll('[data-act-complete]').forEach(b => {
+    b.addEventListener('click', () => {
+      const p = state.projects.find(x => x.id === b.dataset.actComplete);
+      p.status = 'completed';
+      p.dateCompleted = todayISO();
+      // Auto-allocate if fully paid
+      if ((Number(p.amountPaid)||0) >= (Number(p.quotedPrice)||0)) {
+        allocateProject(p);
+        showToast('Project completed — profit allocated to buckets');
+      } else {
+        showToast('Project marked completed');
+      }
+      saveState();
+      renderPipeline();
+    });
+  });
+
+  const rs = document.getElementById('rankSel');
+  if (rs) rs.addEventListener('change', () => {
+    rankingMode = rs.value;
+    renderPipeline();
+  });
+}
+
+function renderUpcomingCard(p) {
+  const balance = (Number(p.quotedPrice)||0) - (Number(p.amountPaid)||0);
+  return `
+    <div class="project-card">
+      <div class="pname">${escapeHtml(p.name)}</div>
+      <div class="pclient">${escapeHtml(p.clientName)}${p.clientContact ? ' · ' + escapeHtml(p.clientContact) : ''}</div>
+      <div class="pgrid">
+        <div><div class="plabel">Quoted</div><div class="pval">${fmt$(p.quotedPrice)}</div></div>
+        <div><div class="plabel">Paid</div><div class="pval">${fmt$(p.amountPaid)}</div></div>
+        <div><div class="plabel">Balance</div><div class="pval">${fmt$(balance)}</div></div>
+        <div><div class="plabel">Cost est.</div><div class="pval">${fmt$(p.totalCost)}</div></div>
+      </div>
+      <div class="pactions">
+        <button class="btn small primary" data-act-move-progress="${p.id}">Move to In Progress</button>
+        <button class="btn small subtle" data-act-edit="${p.id}">Edit</button>
+        <button class="btn small danger" data-act-del="${p.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+function renderInProgressCard(p) {
+  const balance = (Number(p.quotedPrice) || 0) - (Number(p.amountPaid) || 0);
+  return `
+    <div class="project-card in-progress">
+      <div class="pname">${escapeHtml(p.name)}</div>
+      <div class="pclient">${escapeHtml(p.clientName)} · started ${p.dateStarted || '—'}</div>
+      <div class="pgrid">
+        <div><div class="plabel">Quoted</div><div class="pval">${fmt$(p.quotedPrice)}</div></div>
+        <div><div class="plabel">Paid so far</div><div class="pval">${fmt$(p.amountPaid)}</div></div>
+        <div><div class="plabel">Balance</div><div class="pval">${fmt$(balance)}</div></div>
+      </div>
+      <div style="display:flex; gap:6px; align-items:end; margin-top:6px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:120px;">
+          <div class="plabel" style="margin-bottom:3px;">Add payment ($)</div>
+          <input type="number" min="0" step="0.01" placeholder="0.00" data-add-payment="${p.id}"
+            style="width:100%; padding:5px 7px; border:1px solid rgba(156,105,66,0.4); border-radius:4px; font-size:13px;">
+        </div>
+        <button class="btn small primary" data-save-payment="${p.id}" type="button">Save Payment</button>
+      </div>
+      <div class="pactions">
+        <button class="btn small primary" data-act-complete="${p.id}">Mark Completed</button>
+        <button class="btn small subtle" data-act-edit="${p.id}">Edit</button>
+        <button class="btn small danger" data-act-del="${p.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+function renderCompletedCard(p) {
+  return `
+    <div class="project-card completed">
+      <div class="pname">${escapeHtml(p.name)}</div>
+      <div class="pclient">${escapeHtml(p.clientName)} · ${p.dateCompleted || '—'}</div>
+      <div class="pgrid">
+        <div><div class="plabel">Final Price</div><div class="pval">${fmt$(p.amountPaid)}</div></div>
+        <div><div class="plabel">Profit</div><div class="pval">${fmt$(p.profit)}</div></div>
+      </div>
+      <div class="pactions">
+        <button class="btn small subtle" data-act-edit="${p.id}">Edit</button>
+        <button class="btn small danger" data-act-del="${p.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function rankProjects(completed) {
+  const arr = [...completed];
+  arr.sort((a,b) => rankSortKey(b) - rankSortKey(a));
+  return arr;
+}
+function rankSortKey(p) {
+  if (rankingMode === 'highest_profit') return Number(p.profit) || 0;
+  if (rankingMode === 'best_margin') {
+    const q = Number(p.amountPaid) || Number(p.quotedPrice) || 0;
+    return q > 0 ? ((Number(p.profit)||0) / q) * 100 : 0;
+  }
+  if (rankingMode === 'profit_per_hour') {
+    const hrs = (Number(p.machineShopMinutes)||0) / 60;
+    return hrs > 0 ? (Number(p.profit)||0) / hrs : 0;
+  }
+  return 0;
+}
+function rankValue(p) {
+  if (rankingMode === 'highest_profit') return fmt$(p.profit);
+  if (rankingMode === 'best_margin') {
+    const q = Number(p.amountPaid) || Number(p.quotedPrice) || 0;
+    return q > 0 ? (((Number(p.profit)||0) / q) * 100).toFixed(1) + '%' : '—';
+  }
+  if (rankingMode === 'profit_per_hour') {
+    const hrs = (Number(p.machineShopMinutes)||0) / 60;
+    return hrs > 0 ? fmt$((Number(p.profit)||0) / hrs) + '/hr' : '—';
+  }
+}
+
+function confirmDeleteProject(id) {
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  openModal(`
+    <h2 class="modal-title">Delete project?</h2>
+    <p>Are you sure you want to delete <strong>${escapeHtml(p.name)}</strong>? This cannot be undone.</p>
+    ${p.profitAllocated ? `<p style="color:var(--color-text-label); font-style:italic;">This project's profit was already allocated to your buckets. Deleting will reverse that allocation.</p>` : ''}
+    <div class="modal-actions">
+      <button class="btn subtle" id="dlgCancel">Cancel</button>
+      <button class="btn danger" id="dlgConfirm">Delete</button>
+    </div>
+  `);
+  document.getElementById('dlgCancel').addEventListener('click', closeModal);
+  document.getElementById('dlgConfirm').addEventListener('click', () => {
+    if (p.profitAllocated) reverseAllocation(p);
+    state.projects = state.projects.filter(x => x.id !== id);
+    saveState();
+    closeModal();
+    showToast('Project deleted');
+    renderView();
+  });
+}
+
+function openEditProjectModal(id) {
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  openModal(`
+    <h2 class="modal-title">Edit Project</h2>
+    <div class="field"><label>Project name</label><input type="text" id="e-name" value="${escapeHtml(p.name)}"></div>
+    <div class="field-row">
+      <div class="field"><label>Client name</label><input type="text" id="e-clientName" value="${escapeHtml(p.clientName)}"></div>
+      <div class="field"><label>Client contact</label><input type="text" id="e-clientContact" value="${escapeHtml(p.clientContact||'')}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Quoted price</label><input type="number" min="0" step="0.01" id="e-quotedPrice" value="${p.quotedPrice}"></div>
+      <div class="field"><label>Amount paid</label><input type="number" min="0" step="0.01" id="e-amountPaid" value="${p.amountPaid}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Material cost</label><input type="number" min="0" step="0.01" id="e-materialCost" value="${p.materialCost}"></div>
+      <div class="field"><label>Design cost</label><input type="number" min="0" step="0.01" id="e-designCost" value="${p.designCost}"></div>
+    </div>
+    <div class="field"><label>Machine + shop minutes</label><input type="number" min="0" step="1" id="e-machineShopMinutes" value="${p.machineShopMinutes}"></div>
+    <div class="field"><label>Notes</label><textarea id="e-notes" rows="2">${escapeHtml(p.notes||'')}</textarea></div>
+    ${p.profitAllocated ? `<p style="font-style:italic; font-size:12px; color:var(--color-text-label);">Note: this project's profit is already allocated. Edits to cost/payment fields will not reallocate the buckets — adjust them manually if needed.</p>` : ''}
+    <div class="modal-actions">
+      <button class="btn subtle" id="editCancel">Cancel</button>
+      <button class="btn primary" id="editSave">Save</button>
+    </div>
+  `);
+  document.getElementById('editCancel').addEventListener('click', closeModal);
+  document.getElementById('editSave').addEventListener('click', () => {
+    p.name = document.getElementById('e-name').value.trim() || p.name;
+    p.clientName = document.getElementById('e-clientName').value.trim();
+    p.clientContact = document.getElementById('e-clientContact').value.trim();
+    p.quotedPrice = Number(document.getElementById('e-quotedPrice').value) || 0;
+    p.amountPaid = Number(document.getElementById('e-amountPaid').value) || 0;
+    p.materialCost = Number(document.getElementById('e-materialCost').value) || 0;
+    p.designCost = Number(document.getElementById('e-designCost').value) || 0;
+    p.machineShopMinutes = Number(document.getElementById('e-machineShopMinutes').value) || 0;
+    p.notes = document.getElementById('e-notes').value.trim();
+    // Recompute derived costs
+    const c = calcProjectCosts(p);
+    p.suppliesCost = c.suppliesCost;
+    p.totalCost = c.totalCost;
+    p.recommendedPrice = c.recommendedPrice;
+    saveState();
+    closeModal();
+    showToast('Project updated');
+    renderView();
+  });
+}
+
+/* ============================================================
+   VIEW: PROFIT TRACKER
+   ============================================================ */
+function renderTracker() {
+  const view = document.getElementById('view');
+  const purchases = [...state.purchases].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  const ytdSpent = purchases.filter(p => inCurrentYear(p.date)).reduce((s,p) => s + (Number(p.amount)||0), 0);
+
+  view.innerHTML = `
+    <div class="toolbar">
+      <h2 class="section-label left" style="margin:0;">Profit Tracker</h2>
+      <div class="period-toggle" style="margin:0;">
+        <button class="period-btn ${trackerPeriod==='last30'?'active':''}" data-tp="last30">Last 30 days</button>
+        <button class="period-btn ${trackerPeriod==='ytd'?'active':''}" data-tp="ytd">Year to date</button>
+      </div>
+    </div>
+
+    <div class="tracker-buckets">
+      ${trackerBucketCard('Charity', 'charity', 'var(--color-copper)')}
+      ${trackerBucketCard('Investment', 'investment', 'var(--color-text-muted)')}
+      ${trackerBucketCard('My Pay', 'myPay', 'var(--color-olive)')}
+      ${trackerBucketCard('Business Fund', 'businessFund', 'var(--color-frame-bottom)', true)}
+    </div>
+
+    <div class="toolbar" style="margin-top:18px;">
+      <h3 class="section-label left" style="margin:0;">Business Fund Purchases</h3>
+      <button class="btn primary" id="btnAddPurchase">+ Add Purchase</button>
+    </div>
+
+    <div id="purchaseFormHost"></div>
+
+    ${purchases.length === 0
+      ? `<div class="empty-state">No purchases yet</div>`
+      : `
+        <table class="purchase-table">
+          <thead><tr><th>Date</th><th>Vendor</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody>
+            ${purchases.map(p => `
+              <tr>
+                <td>${p.date}</td>
+                <td>${escapeHtml(p.vendor)}</td>
+                <td class="num">${fmt$(p.amount)}</td>
+                <td class="num"><button class="btn small danger" data-del-purchase="${p.id}">Remove</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="ytd-line">Spent this year: ${fmt$(ytdSpent)}</div>
+      `}
+  `;
+
+  view.querySelectorAll('[data-tp]').forEach(b => {
+    b.addEventListener('click', () => { trackerPeriod = b.dataset.tp; renderTracker(); });
+  });
+  view.querySelectorAll('[data-adjust]').forEach(b => {
+    b.addEventListener('click', () => openAdjustModal(b.dataset.adjust));
+  });
+  document.getElementById('btnAddPurchase').addEventListener('click', () => {
+    document.getElementById('purchaseFormHost').innerHTML = `
+      <div class="purchase-add-form">
+        <div class="field" style="margin:0;"><label>Vendor</label><input type="text" id="pu-vendor"></div>
+        <div class="field" style="margin:0;"><label>Amount ($)</label><input type="number" min="0" step="0.01" id="pu-amount"></div>
+        <div class="field" style="margin:0;"><label>Date</label><input type="date" id="pu-date" value="${todayISO()}"></div>
+        <button class="btn primary" id="pu-save">Save</button>
+      </div>
+    `;
+    document.getElementById('pu-save').addEventListener('click', () => {
+      const v = document.getElementById('pu-vendor').value.trim();
+      const a = Number(document.getElementById('pu-amount').value) || 0;
+      const d = document.getElementById('pu-date').value || todayISO();
+      if (!v || a <= 0) { showToast('Vendor and amount required'); return; }
+      state.purchases.push({ id: uuid(), vendor: v, amount: a, date: d });
+      // Subtract from business fund immediately
+      state.bucketBalances.businessFund -= a;
+      saveState();
+      renderTracker();
+      showToast('Purchase logged');
+    });
+  });
+  view.querySelectorAll('[data-del-purchase]').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.delPurchase;
+      const p = state.purchases.find(x => x.id === id);
+      if (!p) return;
+      if (!confirm('Remove this purchase? Your business fund will be refunded.')) return;
+      state.bucketBalances.businessFund += Number(p.amount) || 0;
+      state.purchases = state.purchases.filter(x => x.id !== id);
+      saveState();
+      renderTracker();
+    });
+  });
+}
+
+function trackerBucketCard(name, key, accent, taxWarn) {
+  const periodAdds = sumBucketAdditions(key, trackerPeriod);
+  // Label + balance are drawn inside the SVG. The period total and the
+  // Adjust link remain below the bucket since they're tracker-specific.
+  return `
+    <div class="bucket-card">
+      ${bucketSVG(name, fmt$0(state.bucketBalances[key]))}
+      <div style="font-size:11px; color:var(--color-text-muted); margin-top:6px;">+${fmt$(periodAdds)} this period</div>
+      ${taxWarn ? `<div class="bucket-tax-warn">⚠ Taxes not yet paid</div>` : ''}
+      <button class="bucket-adjust-link" data-adjust="${key}">Adjust</button>
+    </div>
+  `;
+}
+
+function sumBucketAdditions(bucket, period) {
+  // Sum of profit-share for completed projects in the period + manual adjustments (+ business fund cost recovery for businessFund)
+  const pct = state.settings.bucketPercents;
+  const filterFn = period === 'last30'
+    ? (d) => withinDays(d, 30)
+    : (d) => inCurrentYear(d);
+  let total = 0;
+  state.projects.forEach(p => {
+    if (p.status !== 'completed' || !p.profitAllocated) return;
+    if (!filterFn(p.dateCompleted)) return;
+    const profit = Number(p.profit) || 0;
+    if (bucket === 'businessFund') {
+      total += (Number(p.totalCost) || 0); // cost recovery
+      total += profit * (pct.businessFund/100);
+    } else if (bucket === 'charity') {
+      total += profit * (pct.charity/100);
+    } else if (bucket === 'investment') {
+      total += profit * (pct.investment/100);
+    } else if (bucket === 'myPay') {
+      total += profit * (pct.myPay/100);
+    }
+  });
+  state.bucketAdjustments.forEach(adj => {
+    if (adj.bucket !== bucket) return;
+    if (!filterFn(adj.date)) return;
+    const a = Number(adj.amount) || 0;
+    if (a > 0) total += a;
+  });
+  return Math.max(0, total);
+}
+
+function openAdjustModal(bucketKey) {
+  const labels = { charity: 'Charity', investment: 'Investment', myPay: 'My Pay', businessFund: 'Business Fund' };
+  openModal(`
+    <h2 class="modal-title">Adjust ${labels[bucketKey]}</h2>
+    <p style="font-size:13px; color:var(--color-text-muted); margin-top:0;">Add a positive number to add to this bucket, or negative to subtract.</p>
+    <div class="field"><label>Amount ($)</label><input type="number" step="0.01" id="adj-amount" placeholder="e.g. 25 or -25"></div>
+    <div class="field"><label>Note</label><input type="text" id="adj-note" placeholder="optional"></div>
+    <div class="field"><label>Date</label><input type="date" id="adj-date" value="${todayISO()}"></div>
+    <div class="modal-actions">
+      <button class="btn subtle" id="adjCancel">Cancel</button>
+      <button class="btn primary" id="adjSave">Save</button>
+    </div>
+  `);
+  document.getElementById('adjCancel').addEventListener('click', closeModal);
+  document.getElementById('adjSave').addEventListener('click', () => {
+    const a = Number(document.getElementById('adj-amount').value);
+    if (isNaN(a) || a === 0) { showToast('Enter a non-zero amount'); return; }
+    state.bucketAdjustments.push({
+      id: uuid(),
+      bucket: bucketKey,
+      amount: a,
+      note: document.getElementById('adj-note').value.trim(),
+      date: document.getElementById('adj-date').value || todayISO()
+    });
+    state.bucketBalances[bucketKey] += a;
+    saveState();
+    closeModal();
+    showToast('Adjustment saved');
+    renderView();
+  });
+}
+
+/* ============================================================
+   VIEW: SHOP GOALS
+   ============================================================ */
+function renderGoals() {
+  const view = document.getElementById('view');
+  const goals = state.shopGoals;
+  const priority = goals.find(g => g.isPriority);
+  const others = goals.filter(g => !g.isPriority);
+  const bf = state.bucketBalances.businessFund;
+
+  view.innerHTML = `
+    <div class="toolbar">
+      <h2 class="section-label left" style="margin:0;">Shop Goals</h2>
+      <button class="btn primary" id="btnAddGoal">+ Add Goal</button>
+    </div>
+
+    <div class="shop-reminder">Best practice — keep 1–3 months of business funding in reserve before purchasing tools.</div>
+
+    <div id="goalFormHost"></div>
+
+    ${goals.length === 0
+      ? `<div class="empty-state">Add your first goal to start tracking</div>`
+      : `
+        ${priority ? `
+          <div class="goal-priority">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+              <div class="gname">${escapeHtml(priority.name)}</div>
+              <button class="btn small danger" data-del-goal="${priority.id}" type="button">Delete</button>
+            </div>
+            ${(() => {
+              const cost = Number(priority.cost) || 0;
+              const pctNum = cost > 0 ? Math.min(100, Math.max(0, (bf / cost) * 100)) : 0;
+              const togo = Math.max(0, cost - bf);
+              const ready = bf >= cost && cost > 0;
+              return `
+                <div class="gprog-text">${fmt$(Math.max(0, bf))} of ${fmt$(cost)} saved — ${fmt$(togo)} to go</div>
+                <div class="progress-track"><div class="progress-fill" style="width:${pctNum}%"></div></div>
+                ${ready ? `<div class="ready-badge">Ready to buy!</div>` : ''}
+              ` })()}
+          </div>
+        ` : ''}
+
+        ${others.length > 0 ? `
+          <div class="goals-list">
+            ${others.map(g => `
+              <div class="goal-item">
+                <div>
+                  <div class="gn">${escapeHtml(g.name)}</div>
+                  <div class="gc">${fmt$(g.cost)}</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn small subtle" data-priority-goal="${g.id}" type="button">Set as priority</button>
+                  <button class="btn small danger" data-del-goal="${g.id}" type="button">Delete</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      `}
+  `;
+
+  document.getElementById('btnAddGoal').addEventListener('click', () => {
+    document.getElementById('goalFormHost').innerHTML = `
+      <div class="purchase-add-form" style="grid-template-columns: 2fr 1fr auto;">
+        <div class="field" style="margin:0;"><label>Goal name</label><input type="text" id="g-name" placeholder="e.g. New spindle"></div>
+        <div class="field" style="margin:0;"><label>Cost ($)</label><input type="number" min="0" step="0.01" id="g-cost"></div>
+        <button class="btn primary" id="g-save">Save</button>
+      </div>
+    `;
+    document.getElementById('g-save').addEventListener('click', () => {
+      const n = document.getElementById('g-name').value.trim();
+      const c = Number(document.getElementById('g-cost').value) || 0;
+      if (!n || c <= 0) { showToast('Name and cost required'); return; }
+      const isFirst = state.shopGoals.length === 0;
+      state.shopGoals.push({ id: uuid(), name: n, cost: c, isPriority: isFirst });
+      saveState();
+      renderGoals();
+      showToast('Goal added');
+    });
+  });
+
+  // Event delegation for goal actions. Using delegation rather than per-button
+  // listeners means a stray re-render or DOM swap can't strand a handler, and
+  // it works regardless of which button (priority or non-priority) is clicked.
+  view.addEventListener('click', handleGoalClick);
+}
+
+function handleGoalClick(e) {
+  const delBtn = e.target.closest('[data-del-goal]');
+  if (delBtn) {
+    e.preventDefault();
+    deleteGoal(delBtn.dataset.delGoal);
+    return;
+  }
+  const priBtn = e.target.closest('[data-priority-goal]');
+  if (priBtn) {
+    e.preventDefault();
+    const id = priBtn.dataset.priorityGoal;
+    state.shopGoals.forEach(g => { g.isPriority = (g.id === id); });
+    saveState();
+    renderGoals();
+  }
+}
+
+function deleteGoal(id) {
+  const g = state.shopGoals.find(x => x.id === id);
+  if (!g) return;
+  // Use the in-app modal instead of window.confirm — confirm() can be blocked
+  // or silently dismissed in some embedded contexts, which made delete look broken.
+  openModal(`
+    <h2 class="modal-title">Delete goal?</h2>
+    <p>Are you sure you want to delete <strong>${escapeHtml(g.name)}</strong>?</p>
+    <div class="modal-actions">
+      <button class="btn subtle" id="goalDelCancel" type="button">Cancel</button>
+      <button class="btn danger" id="goalDelConfirm" type="button">Delete</button>
+    </div>
+  `);
+  document.getElementById('goalDelCancel').addEventListener('click', closeModal);
+  document.getElementById('goalDelConfirm').addEventListener('click', () => {
+    const wasPriority = g.isPriority;
+    state.shopGoals = state.shopGoals.filter(x => x.id !== id);
+    // If we removed the priority goal, promote the first remaining goal.
+    if (wasPriority && state.shopGoals.length > 0) {
+      state.shopGoals[0].isPriority = true;
+    }
+    saveState();
+    closeModal();
+    showToast('Goal deleted');
+    renderGoals();
+  });
+}
+
+/* ============================================================
+   SETUP MODAL
+   ============================================================ */
+function openSetupModal() {
+  const s = state.settings;
+  openModal(`
+    <h2 class="modal-title">Setup</h2>
+
+    <div class="modal-section">
+      <h3>Shop Settings</h3>
+      <div class="field">
+        <label>Shop rate ($/hr)</label>
+        <input type="number" min="0" step="0.01" id="s-shopRate" value="${s.shopRate}">
+        <div class="help-text">Your time + machine + electricity per hour</div>
+      </div>
+      <div class="field">
+        <label>Supplies percentage (%)</label>
+        <input type="number" min="0" step="0.1" id="s-supplies" value="${s.suppliesPercent}">
+        <div class="help-text">The 20% Supplies Rule covers sandpaper, finish, glue, and other consumables</div>
+      </div>
+      <div class="field">
+        <label>Profit margin (%)</label>
+        <input type="number" min="0" max="99" step="0.1" id="s-margin" value="${s.profitMargin}">
+        <div class="help-text">A 50% profit margin means half of your selling price is profit</div>
+      </div>
+      <div class="field">
+        <label>Sales tax (%)</label>
+        <input type="number" min="0" step="0.001" id="s-tax" value="${s.salesTaxPercent || ''}" placeholder="optional">
+        <div class="help-text">Leave blank to hide tax calculations</div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Profit Allocation Buckets</h3>
+      <p class="help-text" style="margin:0 0 10px;">These four percentages must total 100%.</p>
+      <div class="bucket-pct-grid">
+        <div class="field"><label>Charity (%)</label><input type="number" min="0" max="100" step="0.1" id="s-bp-charity" value="${s.bucketPercents.charity}"></div>
+        <div class="field"><label>Investment (%)</label><input type="number" min="0" max="100" step="0.1" id="s-bp-investment" value="${s.bucketPercents.investment}"></div>
+        <div class="field"><label>My Pay (%)</label><input type="number" min="0" max="100" step="0.1" id="s-bp-myPay" value="${s.bucketPercents.myPay}"></div>
+        <div class="field"><label>Business Fund (%)</label><input type="number" min="0" max="100" step="0.1" id="s-bp-businessFund" value="${s.bucketPercents.businessFund}"></div>
+      </div>
+      <div class="bucket-pct-total" id="bpTotal"></div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Data Backup</h3>
+      <div class="button-row">
+        <button class="btn" id="s-export">Export My Data</button>
+        <button class="btn" id="s-import">Import Data</button>
+        <input type="file" id="s-import-file" accept="application/json" style="display:none;">
+      </div>
+      <p class="help-text" style="margin-top:10px;">Your data is saved in this browser only. If you clear browser data or switch browsers, you will lose everything. Export regularly!</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn subtle" id="setupCancel">Cancel</button>
+      <button class="btn primary" id="setupSave">Save</button>
+    </div>
+  `);
+
+  function updateBpTotal() {
+    const total = ['charity','investment','myPay','businessFund']
+      .reduce((s,k) => s + (Number(document.getElementById('s-bp-'+k).value) || 0), 0);
+    const el = document.getElementById('bpTotal');
+    el.textContent = `Total: ${total.toFixed(1)}%${total !== 100 ? ' (must equal 100%)' : ' ✓'}`;
+    el.classList.toggle('invalid', total !== 100);
+  }
+  ['charity','investment','myPay','businessFund'].forEach(k => {
+    document.getElementById('s-bp-'+k).addEventListener('input', updateBpTotal);
+  });
+  updateBpTotal();
+
+  document.getElementById('setupCancel').addEventListener('click', closeModal);
+  document.getElementById('setupSave').addEventListener('click', () => {
+    const charity = Number(document.getElementById('s-bp-charity').value) || 0;
+    const investment = Number(document.getElementById('s-bp-investment').value) || 0;
+    const myPay = Number(document.getElementById('s-bp-myPay').value) || 0;
+    const businessFund = Number(document.getElementById('s-bp-businessFund').value) || 0;
+    const total = charity + investment + myPay + businessFund;
+    if (Math.abs(total - 100) > 0.01) {
+      showToast('Bucket percentages must sum to 100');
+      return;
+    }
+    state.settings.shopRate = Number(document.getElementById('s-shopRate').value) || 0;
+    state.settings.suppliesPercent = Number(document.getElementById('s-supplies').value) || 0;
+    state.settings.profitMargin = Number(document.getElementById('s-margin').value) || 0;
+    const taxVal = document.getElementById('s-tax').value;
+    state.settings.salesTaxPercent = taxVal === '' ? 0 : (Number(taxVal) || 0);
+    state.settings.bucketPercents = { charity, investment, myPay, businessFund };
+    saveState();
+    closeModal();
+    showToast('Settings saved');
+    renderView();
+  });
+
+  document.getElementById('s-export').addEventListener('click', exportData);
+  document.getElementById('s-import').addEventListener('click', () => document.getElementById('s-import-file').click());
+  document.getElementById('s-import-file').addEventListener('change', importData);
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cnc-shop-data-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Data exported');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm('This will replace all current data. Continue?')) {
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      // Minimal sanity check
+      if (typeof data !== 'object' || !data.settings || !Array.isArray(data.projects)) throw new Error('Invalid file');
+      state = {
+        ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
+        ...data,
+        settings: { ...DEFAULT_STATE.settings, ...data.settings,
+          bucketPercents: { ...DEFAULT_STATE.settings.bucketPercents, ...(data.settings.bucketPercents || {}) }
+        },
+        bucketBalances: { ...DEFAULT_STATE.bucketBalances, ...(data.bucketBalances || {}) }
+      };
+      saveState();
+      showToast('Data imported');
+      closeModal();
+      renderView();
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   MODAL HELPERS
+   ============================================================ */
+function openModal(html) {
+  const back = document.getElementById('modalBackdrop');
+  document.getElementById('modalInner').innerHTML = html;
+  back.classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+}
+document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'modalBackdrop') closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ============================================================
+   ESCAPE
+   ============================================================ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.getElementById('setupBtn').addEventListener('click', openSetupModal);
+
+renderTabs();
+renderView();
+</script>
+</body>
+</html>
